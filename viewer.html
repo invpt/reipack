@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <title>Packing Viewer</title>
+</head>
+
+<body>
+    <div><label for="textarea">Packing base64</label></div>
+    <textarea id="textarea" oninput="packingChanged()" rows="8" cols="120"></textarea>
+    <div id="packing"></div>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script>
+        packingChanged()
+        function packingChanged() {
+            let packing = JSON.parse(atob(document.getElementById("textarea").value));
+
+            document.getElementById("packing").replaceChildren(Packing(packing));
+        }
+
+        function Packing(packing) {
+            let width = 500;
+            let height = 500;
+            let color = "red";
+
+            const svg = d3.create("svg")
+                .attr("width", width)
+                .attr("height", height)
+                .attr("viewBox", [0, 0, 5, 5])
+                .attr("style", "max-width: 100%; height: auto; height: intrinsic;");
+
+            const bar = svg.append("g")
+                .attr("fill", color)
+                .selectAll("rect")
+                .data(packing)
+                .join("rect")
+                .attr("x", ([x1]) => x1)
+                .attr("y", ([_, y1]) => y1)
+                .attr("width", ([x1, __, x2]) => x2 - x1)
+                .attr("height", ([_, y1, __, y2]) => y2 - y1);
+
+            return svg.node();
+        }
+    </script>
+</body>
+
+</html>
