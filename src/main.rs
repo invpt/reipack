@@ -13,8 +13,8 @@ struct Rect {
 
 impl Rect {
     fn overlaps(&self, other: &Rect) -> bool {
-        let x_overlap = self.x1 <= other.x2 && self.x2 >= other.x1 || other.x1 <= self.x2 && other.x2 >= self.x1;
-        let y_overlap = self.y1 <= other.y2 && self.y2 >= other.y1 || other.y1 <= self.y2 && other.y2 >= self.y1;
+        let x_overlap = self.x1 <= other.x2 && self.x2 >= other.x1;
+        let y_overlap = self.y1 <= other.y2 && self.y2 >= other.y1;
 
         x_overlap && y_overlap
     }
@@ -97,10 +97,10 @@ fn main() {
         while {rects = RECTS_INIT; !randomize_packing(&mut rects)} {}
         let score = score(rects.iter());
         if score < 1.0 {
-            output.write(score.to_string().as_bytes()).unwrap();
-            output.write(b",").unwrap();
-            output.write(serialize_packing(&rects).as_bytes()).unwrap();
-            output.write(b"\n").unwrap();
+            output.write_all(score.to_string().as_bytes()).unwrap();
+            output.write_all(b",").unwrap();
+            output.write_all(serialize_packing(&rects).as_bytes()).unwrap();
+            output.write_all(b"\n").unwrap();
         }
     }
 }
