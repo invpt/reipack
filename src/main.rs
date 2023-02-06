@@ -5,21 +5,21 @@ use rand::prelude::*;
 
 #[derive(Debug)]
 struct Rect {
-    x1: f64,
-    y1: f64,
-    x2: f64,
-    y2: f64,
+    x1: i32,
+    y1: i32,
+    x2: i32,
+    y2: i32,
 }
 
 impl Rect {
     fn overlaps(&self, other: &Rect) -> bool {
-        let x_overlap = self.x1 <= other.x2 && self.x2 >= other.x1;
-        let y_overlap = self.y1 <= other.y2 && self.y2 >= other.y1;
+        let x_overlap = self.x1 < other.x2 && self.x2 > other.x1;
+        let y_overlap = self.y1 < other.y2 && self.y2 > other.y1;
 
         x_overlap && y_overlap
     }
 
-    fn area(&self) -> f64 {
+    fn area(&self) -> i32 {
         (self.x2 - self.x1) * (self.y2 - self.y1)
     }
 
@@ -41,15 +41,15 @@ fn serialize_packing(packing: &[Rect]) -> String {
     BASE64_STANDARD.encode(s)
 }
 
-fn score<'a>(packing: impl Iterator<Item = &'a Rect>) -> f64 {
+fn score<'a>(packing: impl Iterator<Item = &'a Rect>) -> i32 {
     let mut bounds = Rect {
-        x1: f64::INFINITY,
-        y1: f64::INFINITY,
-        x2: -f64::INFINITY,
-        y2: -f64::INFINITY,
+        x1: i32::MAX,
+        y1: i32::MAX,
+        x2: i32::MIN,
+        y2: i32::MIN,
     };
 
-    let mut rects_area = 0.0;
+    let mut rects_area = 0;
     for rect in packing {
         bounds.x1 = bounds.x1.min(rect.x1);
         bounds.x2 = bounds.x2.max(rect.x2);
@@ -64,39 +64,39 @@ fn score<'a>(packing: impl Iterator<Item = &'a Rect>) -> f64 {
 fn main() {
     const RECTS_INIT: [Rect; 4] = [
         Rect {
-            x1: 0.0,
-            x2: 1.0,
-            y1: 0.0,
-            y2: 1.0,
+            x1: 0,
+            x2: 1,
+            y1: 0,
+            y2: 1,
         },
         Rect {
-            x1: 0.0,
-            x2: 2.0,
-            y1: 0.0,
-            y2: 1.0,
+            x1: 0,
+            x2: 2,
+            y1: 0,
+            y2: 1,
         },
         Rect {
-            x1: 0.0,
-            x2: 1.0,
-            y1: 0.0,
-            y2: 2.0,
+            x1: 0,
+            x2: 1,
+            y1: 0,
+            y2: 2,
         },
         Rect {
-            x1: 0.0,
-            x2: 2.0,
-            y1: 0.0,
-            y2: 2.0,
+            x1: 0,
+            x2: 2,
+            y1: 0,
+            y2: 2,
         },
     ];
 
-    let trials = 100000000;
+    let trials = 100000;
     let mut output = std::io::BufWriter::with_capacity(65536, std::fs::File::create("out.csv").unwrap());
 
     let mut rects;
     for _ in 0..trials {
         while {rects = RECTS_INIT; !randomize_packing(&mut rects)} {}
         let score = score(rects.iter());
-        if score < 1.0 {
+        if score < 8 {
             output.write_all(score.to_string().as_bytes()).unwrap();
             output.write_all(b",").unwrap();
             output.write_all(serialize_packing(&rects).as_bytes()).unwrap();
@@ -107,10 +107,10 @@ fn main() {
 
 fn randomize_packing(rects: &mut [Rect]) -> bool {
     let outer_bounds = Rect {
-        x1: 0.0,
-        y1: 0.0,
-        x2: rects.iter().map(|r| r.x2 - r.x1).sum::<f64>() + 0.1,
-        y2: rects.iter().map(|r| r.y2 - r.y1).sum::<f64>() + 0.1,
+        x1: 0,
+        y1: 0,
+        x2: rects.iter().map(|r| r.x2 - r.x1).sum::<i32>(),
+        y2: rects.iter().map(|r| r.y2 - r.y1).sum::<i32>(),
     };
 
     'outer: for i in 1..=rects.len() {
