@@ -26,6 +26,10 @@ impl Rect {
     fn serialize(&self) -> String {
         format!("[{},{},{},{}]", self.x1, self.y1, self.x2, self.y2)
     }
+
+    fn serialize_size(&self) -> String {
+        format!("[{},{}]", self.x2 - self.x1, self.y2 - self.y1)
+    }
 }
 
 fn serialize_packing(packing: &[Rect]) -> String {
@@ -33,6 +37,19 @@ fn serialize_packing(packing: &[Rect]) -> String {
     s += "[";
     for (i, rect) in packing.iter().enumerate() {
         s += &*rect.serialize();
+        if i != packing.len() - 1 {
+            s += ",";
+        }
+    }
+    s += "]";
+    BASE64_STANDARD.encode(s)
+}
+
+fn serialize_order(packing: &[Rect]) -> String {
+    let mut s = String::new();
+    s += "[";
+    for (i, rect) in packing.iter().enumerate() {
+        s += &*rect.serialize_size();
         if i != packing.len() - 1 {
             s += ",";
         }
@@ -89,23 +106,27 @@ fn main() {
         },
     ];
 
-    let trials = 100000;
+    let trials = 10000000;
     let mut output = std::io::BufWriter::with_capacity(65536, std::fs::File::create("out.csv").unwrap());
 
     let mut rects;
     for _ in 0..trials {
         while {rects = RECTS_INIT; !randomize_packing(&mut rects)} {}
         let score = score(rects.iter());
-        if score < 8 {
-            output.write_all(score.to_string().as_bytes()).unwrap();
-            output.write_all(b",").unwrap();
-            output.write_all(serialize_packing(&rects).as_bytes()).unwrap();
-            output.write_all(b"\n").unwrap();
-        }
+        output.write_all(score.to_string().as_bytes()).unwrap();
+        output.write_all(b",").unwrap();
+        output.write_all(serialize_packing(&rects).as_bytes()).unwrap();
+        output.write_all(b",").unwrap();
+        output.write_all(serialize_order(&rects).as_bytes()).unwrap();
+        output.write_all(b"\n").unwrap();
     }
 }
 
 fn randomize_packing(rects: &mut [Rect]) -> bool {
+    let mut rng = rand::thread_rng();
+
+    rects.shuffle(&mut rng);
+
     let outer_bounds = Rect {
         x1: 0,
         y1: 0,
@@ -118,8 +139,8 @@ fn randomize_packing(rects: &mut [Rect]) -> bool {
         for _ in 0..100 {
             let width = rect.x2 - rect.x1;
             let height = rect.y2 - rect.y1;
-            let x1 = rand::thread_rng().gen_range(outer_bounds.x1..outer_bounds.x2 - width);
-            let y1 = rand::thread_rng().gen_range(outer_bounds.y1..outer_bounds.y2 - height);
+            let x1 = rng.gen_range(outer_bounds.x1..outer_bounds.x2 - width);
+            let y1 = rng.gen_range(outer_bounds.y1..outer_bounds.y2 - height);
             let new_rect = Rect {
                 x1,
                 y1,

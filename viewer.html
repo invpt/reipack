@@ -7,13 +7,17 @@
 
 <body>
     <div><label for="textarea">Packing base64</label></div>
-    <textarea id="textarea" oninput="packingChanged()" rows="8" cols="120"></textarea>
+    <textarea id="textarea" oninput="packingChanged()" rows="8" cols="60"></textarea>
+    <pre id="decoded"></pre>
     <div id="packing"></div>
     <script src="https://d3js.org/d3.v7.min.js"></script>
     <script>
         packingChanged()
         function packingChanged() {
-            let packing = JSON.parse(atob(document.getElementById("textarea").value));
+            let packingJson = atob(document.getElementById("textarea").value);
+            document.getElementById("decoded").innerText = packingJson;
+            
+            let packing = JSON.parse(packingJson);
 
             document.getElementById("packing").replaceChildren(Packing(packing));
         }
