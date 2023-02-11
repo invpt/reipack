@@ -279,6 +279,22 @@ fn invert(packing: &[Rect]) -> Vec<Rect> {
     inverted
 }
 
+fn spread_score(packing: &[Rect]) -> f64 {
+    const M: f64 = 0.5;
+    const K: f64 = 0.75;
+    let s = packing
+        .iter()
+        .map(|r| (r.width() + r.height()) as f64)
+        .sum::<f64>()
+        / (2 * packing.len()) as f64;
+    let mapping = |x: f64| (2.0 * M * s.sqrt() * x.sqrt() + s * (K - 2.0 * M)).max(if x < s { x } else { 0.0 });
+    let inverted = invert(packing);
+    inverted
+        .iter()
+        .map(|r| mapping(r.area() as f64))
+        .sum()
+}
+
 fn main() {
     const RECTS_INIT: [Rect; 4] = [
         Rect {
@@ -324,7 +340,7 @@ fn main() {
         output.write_all(score_val.to_string().as_bytes()).unwrap();
         output.write_all(b",").unwrap();
         output
-            .write_all(serialize_packing(&invert(&rects)).as_bytes())
+            .write_all(spread_score(&rects).to_string().as_bytes())
             .unwrap();
         output.write_all(b",").unwrap();
         output
