@@ -43,7 +43,7 @@ fn main() {
         std::io::BufWriter::with_capacity(65536, std::fs::File::create("out.csv").unwrap());
 
     let algorithm = algorithms::packing::iterative_random::IterativeRandomPackingAlgorithm {
-        heuristic: heuristics::spread_score::SpreadScorePackingHeuristic,
+        heuristic: heuristics::spread::SpreadPackingHeuristic,
         trials_per_iteration: 1000,
     };
 
@@ -59,7 +59,7 @@ fn main() {
         output.write_all(b",").unwrap();
         output
             .write_all(
-                heuristics::spread_score::spread_score(&rects)
+                heuristics::spread::spread_score(&rects)
                     .to_string()
                     .as_bytes(),
             )
@@ -75,7 +75,7 @@ fn main() {
         output.write_all(b",").unwrap();
         output
             .write_all(
-                heuristics::closeness_score::closeness_score(&rects)
+                heuristics::closeness::closeness_score(&rects)
                     .to_string()
                     .as_bytes(),
             )

@@ -25,9 +25,9 @@ pub fn closeness_score(packing: &[Rect]) -> f32 {
     acc
 }
 
-pub struct ClosenessScorePackingHeuristic;
+pub struct ClosenessPackingHeuristic;
 
-impl PackingHeuristic for ClosenessScorePackingHeuristic {
+impl PackingHeuristic for ClosenessPackingHeuristic {
     type Score = f32;
 
     fn score(&self, packing: &[Rect]) -> f32 {
@@ -35,7 +35,7 @@ impl PackingHeuristic for ClosenessScorePackingHeuristic {
     }
 }
 
-impl PackingHeuristicScore<ClosenessScorePackingHeuristic> for f32 {
+impl PackingHeuristicScore<ClosenessPackingHeuristic> for f32 {
     fn is_better_than(&self, other: &Self) -> bool {
         self > other
     }

@@ -18,9 +18,9 @@ pub fn spread_score(packing: &[Rect]) -> f64 {
     inverted.iter().map(|r| mapping(r.area() as f64)).sum()
 }
 
-pub struct SpreadScorePackingHeuristic;
+pub struct SpreadPackingHeuristic;
 
-impl PackingHeuristic for SpreadScorePackingHeuristic {
+impl PackingHeuristic for SpreadPackingHeuristic {
     type Score = f64;
 
     fn score(&self, packing: &[Rect]) -> f64 {
@@ -28,7 +28,7 @@ impl PackingHeuristic for SpreadScorePackingHeuristic {
     }
 }
 
-impl PackingHeuristicScore<SpreadScorePackingHeuristic> for f64 {
+impl PackingHeuristicScore<SpreadPackingHeuristic> for f64 {
     fn is_better_than(&self, other: &Self) -> bool {
         self < other
     }

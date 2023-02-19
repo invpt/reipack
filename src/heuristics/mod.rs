@@ -1,3 +1,3 @@
-pub mod closeness_score;
+pub mod closeness;
 pub mod score;
-pub mod spread_score;
+pub mod spread;
