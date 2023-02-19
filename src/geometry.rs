@@ -214,6 +214,57 @@ impl Rect {
             .into_iter()
             .filter(|r| !r.is_empty())
     }
+
+    pub fn inverse(packing: &[Rect]) -> Vec<Rect> {
+        let mut inverted = vec![Rect::bbox(packing.iter())];
+        for rect in packing {
+            let mut i = 0;
+            while i < inverted.len() {
+                let mut iter = inverted[i].cut_out(rect);
+                if let Some(first) = iter.next() {
+                    inverted[i] = first;
+
+                    for additional in iter {
+                        inverted.push(additional);
+                    }
+
+                    i += 1;
+                } else {
+                    inverted.remove(i);
+                }
+            }
+        }
+        Self::simplify(&mut inverted);
+        inverted
+    }
+
+    pub fn simplify(rects: &mut Vec<Rect>) {
+        let mut i = 0;
+
+        while i < rects.len() {
+            let mut j = 0;
+
+            while j < rects.len() {
+                if j == i {
+                    j += 1;
+                    continue;
+                }
+
+                if let Some(merged) = rects[i].merge(&rects[j]) {
+                    rects[i] = merged;
+                    rects.remove(j);
+                    j = 0;
+                    if j < i {
+                        i -= 1;
+                    }
+                } else {
+                    j += 1;
+                }
+            }
+
+            i += 1;
+        }
+    }
 }
 
 impl Serialize for Size {
