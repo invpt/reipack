@@ -6,11 +6,16 @@ mod algorithms;
 mod geometry;
 mod heuristics;
 mod traits;
+mod nn;
+
 pub use traits::*;
 
 use geometry::Rect;
 
 fn main() {
+    nn::nn();
+    return;
+
     const RECTS_INIT: [Rect; 4] = [
         Rect {
             x1: 0,
@@ -38,14 +43,11 @@ fn main() {
         },
     ];
 
-    let trials = 10000;
+    let trials = 10000000;
     let mut output =
         std::io::BufWriter::with_capacity(65536, std::fs::File::create("out.csv").unwrap());
 
-    let algorithm = algorithms::packing::iterative_random::IterativeRandomPackingAlgorithm {
-        heuristic: heuristics::spread::SpreadPackingHeuristic,
-        trials_per_iteration: 1000,
-    };
+    let algorithm = algorithms::packing::random::RandomPackingAlgorithm;
 
     let mut rects;
     for _ in 0..trials {
