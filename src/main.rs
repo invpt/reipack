@@ -7,13 +7,14 @@ mod geometry;
 mod heuristics;
 mod traits;
 mod nn;
+mod nn2;
 
 pub use traits::*;
 
 use geometry::Rect;
 
 fn main() {
-    nn::nn();
+    nn2::nn();
     return;
 
     const RECTS_INIT: [Rect; 4] = [
