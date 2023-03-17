@@ -30,6 +30,11 @@ impl Interval {
         self.start < other.end && self.end > other.start
     }
 
+    /// Returns true if this interval fully contains `other`.
+    pub const fn contains(&self, other: &Interval) -> bool {
+        self.start <= other.start && other.end <= self.end
+    }
+
     /// Calculates the intersection between `self` and `other`.
     pub fn intersection(&self, other: &Interval) -> Interval {
         if self.overlaps(other) {
@@ -130,6 +135,11 @@ impl Rect {
     /// Returns true if `self` overlaps with `other`.
     pub const fn overlaps(&self, other: &Rect) -> bool {
         self.horz().overlaps(&other.horz()) && self.vert().overlaps(&other.vert())
+    }
+
+    /// Returns true if `self` fully contains `other`.
+    pub const fn contains(&self, other: &Rect) -> bool {
+        self.horz().contains(&other.horz()) && self.vert().contains(&other.vert())
     }
 
     /// Merges this rectangle with `other` into a single resulting rectangle, if possible.
