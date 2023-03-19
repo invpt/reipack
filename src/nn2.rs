@@ -46,11 +46,11 @@ pub fn nn() {
     let bounds = Rect {
         x1: 0,
         y1: 0,
-        x2: 12,
-        y2: 12,
+        x2: 16,
+        y2: 16,
     };
 
-    let model_dimensions = [bounds.area() as usize + 2, 96, 96, bounds.area() as usize];
+    let model_dimensions = [bounds.area() as usize + 2, 128, 128, bounds.area() as usize];
 
     let model_dimensions_id: String = model_dimensions
         .iter()
@@ -117,6 +117,8 @@ pub fn nn() {
         println!("{:?}", rects);
         println!("{:?}", serialize_packing(&rects));
     }
+
+    return;
 
     let variable_count = driver.model().variable_count();
     let mut optimizer = AdamOptimizer {
