@@ -23,6 +23,7 @@ pub struct TrainingParameters {
     pub future_discount: f32,
     pub exploit_chance_start: f32,
     pub exploit_chance_end: f32,
+    pub exploit_weight: f32,
     pub reward_threshold_start: f32,
     pub reward_threshold_end: f32,
 }
@@ -87,7 +88,7 @@ pub fn train_model(model: &mut Model, params: &TrainingParameters) {
         let reward_threshold = (1.0 - fraction_complete) * params.reward_threshold_start
             + fraction_complete * params.exploit_chance_end;
 
-        let packing = loop {
+        let (packing, net_actions) = loop {
             let packing_size = rng.gen_range(params.packing_size_min..=params.packing_size_max);
 
             let chosen_rects = std::iter::repeat_with(|| params.rects.choose(&mut rng).unwrap())
@@ -154,7 +155,12 @@ pub fn train_model(model: &mut Model, params: &TrainingParameters) {
                 }
                 prediction_validity.push_back(valid);
 
-                result.compute_gradients(&target, |idx, val| dx[idx] += q * val);
+                let weight = if net_actions[i] {
+                    q * params.exploit_weight
+                } else {
+                    q
+                };
+                result.compute_gradients(&target, |idx, val| dx[idx] += weight * val);
                 grads += 1;
 
                 if grads % params.batch_size == 0 {
@@ -182,13 +188,16 @@ fn find_packing<'a>(
     bounds: &Rect,
     rects: impl Iterator<Item = &'a Rect>,
     exploit_chance: f32,
-) -> Option<Vec<Rect>> {
+) -> Option<(Vec<Rect>, Vec<bool>)> {
     let mut packing = Vec::<Rect>::with_capacity(rects.size_hint().0);
+    let mut net_choices = Vec::<bool>::with_capacity(rects.size_hint().0);
 
     for rect in rects {
         let input = vectorize_input(bounds, &packing, rect.width(), rect.height());
 
-        let chosen_pos_index = if rng.gen_range(0.0..1.0) < exploit_chance {
+        let exploit = rng.gen_range(0.0..1.0) < exploit_chance;
+
+        let chosen_pos_index = if exploit {
             // attempt to find a position for the rectangle using the model
             let result = driver.run(&input);
             result
@@ -201,12 +210,17 @@ fn find_packing<'a>(
             // choose one of the remaining places randomly
             let placeable = &input[..input.len() - 3];
             let count = placeable.iter().filter(|&&x| x == 1.0).count();
-            placeable
-                .iter()
-                .enumerate()
-                .filter(|(_, &x)| x == 1.0)
-                .nth(rng.gen_range(0..count))
-                .map(|(i, _)| i)
+
+            if count > 0 {
+                placeable
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, &x)| x == 1.0)
+                    .nth(rng.gen_range(0..count))
+                    .map(|(i, _)| i)
+            } else {
+                None
+            }
         };
 
         let Some(chosen_pos_index) = chosen_pos_index else { return None };
@@ -223,12 +237,13 @@ fn find_packing<'a>(
 
         if bounds.contains(&placed_rect) && packing.iter().all(|r| !r.overlaps(&placed_rect)) {
             packing.push(placed_rect);
+            net_choices.push(exploit);
         } else {
             return None;
         }
     }
 
-    Some(packing)
+    Some((packing, net_choices))
 }
 
 pub fn evaluate_model<'a>(
@@ -257,12 +272,14 @@ pub fn evaluate_model<'a>(
             if bounds.contains(&rect) && packing.iter().all(|r| !r.overlaps(&rect)) {
                 packing.push(rect);
             } else {
+                println!("FAIL: {packing:?}, TRIED: {rect:?}");
                 success = false;
                 break;
             }
         }
 
         if success {
+            println!("SUCCESS: {packing:?}");
             samples_count += 1;
             total_reward += reward(bounds, &packing);
         } else {

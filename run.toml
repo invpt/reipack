@@ -1,46 +1,44 @@
-hidden_layers = [96, 96]
+hidden_layers = [192, 192]
 
 rects = [
+    [0, 0, 1, 1],
+    [0, 0, 1, 2],
+    [0, 0, 1, 3],
+    [0, 0, 1, 4],
+    [0, 0, 2, 1],
     [0, 0, 2, 2],
+    [0, 0, 2, 3],
     [0, 0, 2, 4],
+    [0, 0, 3, 1],
+    [0, 0, 3, 2],
+    [0, 0, 3, 3],
+    [0, 0, 3, 4],
+    [0, 0, 4, 1],
     [0, 0, 4, 2],
+    [0, 0, 4, 3],
     [0, 0, 4, 4],
-    #[0, 0, 1, 1],
-    #[0, 0, 1, 2],
-    #[0, 0, 1, 3],
-    #[0, 0, 1, 4],
-    #[0, 0, 2, 1],
-    #[0, 0, 2, 2],
-    #[0, 0, 2, 3],
-    #[0, 0, 2, 4],
-    #[0, 0, 3, 1],
-    #[0, 0, 3, 2],
-    #[0, 0, 3, 3],
-    #[0, 0, 3, 4],
-    #[0, 0, 4, 1],
-    #[0, 0, 4, 2],
-    #[0, 0, 4, 3],
-    #[0, 0, 4, 4],
 ]
 
-bounds = [0, 0, 12, 12]
+bounds = [0, 0, 16, 16]
 
-packing_size_min = 4
-packing_size_max = 4
+packing_size_min = 3
+packing_size_max = 7
 
-learning_rate_start = 0.00005
-learning_rate_end = 0.00005
+learning_rate_start = 0.000001
+learning_rate_end = 0.0
 beta_1 = 0.9
 beta_2 = 0.99
 
-batch_size = 96
+batch_size = 1024
 
-trials = 500_000
+trials = 1_000_000
 
 future_discount = 0.75
 
-exploit_chance_start = 0.0
-exploit_chance_end = 0.0
+exploit_chance_start = 0.9
+exploit_chance_end = 0.9
 
-reward_threshold_start = 0.6
-reward_threshold_end = 0.6
+exploit_weight = 0.0
+
+reward_threshold_start = 0.5
+reward_threshold_end = 0.7
