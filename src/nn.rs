@@ -3,6 +3,8 @@ use rand::{seq::SliceRandom, Rng};
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 use std::io::{self, prelude::*, BufWriter};
+use std::ops::Deref;
+use std::thread;
 use std::{fs::File, path::Path};
 
 use crate::geometry::Rect;
@@ -65,20 +67,24 @@ pub fn load_weights(model: &mut Model, path: &Path) -> io::Result<()> {
 }
 
 pub fn train_model(model: &mut Model, params: &TrainingParameters) {
-    let mut driver = model.driver_mut();
+    let parallelism = thread::available_parallelism()
+        .map(|v| v.get())
+        .unwrap_or(1);
+    let pool = rayon::ThreadPoolBuilder::new()
+        .num_threads(parallelism)
+        .build()
+        .unwrap();
 
-    let mut rng = rand::thread_rng();
-    let mut dx = vec![0.0; driver.model().variable_count()];
+    let mut dx = vec![0.0; model.variable_count()];
     let mut optimizer = AdamOptimizer {
         learning_rate: params.learning_rate_start,
         beta_1: params.beta_1,
         beta_2: params.beta_2,
     }
-    .instance(driver.model().variable_count());
+    .instance(model.variable_count());
 
     let mut prediction_validity = VecDeque::<bool>::with_capacity(10_000);
     let mut trial = 0;
-    let mut grads = 0;
     while trial < params.trials {
         let fraction_complete = trial as f32 / params.trials as f32;
 
@@ -88,103 +94,132 @@ pub fn train_model(model: &mut Model, params: &TrainingParameters) {
         let reward_threshold = (1.0 - fraction_complete) * params.reward_threshold_start
             + fraction_complete * params.exploit_chance_end;
 
-        let (packing, net_actions) = loop {
-            let packing_size = rng.gen_range(params.packing_size_min..=params.packing_size_max);
+        // status message
+        {
+            let chosen_rect = &params.rects[params.rects.len() / 2];
+            let input = vectorize_input(&params.bounds, &[], chosen_rect.width(), chosen_rect.height());
+            let mut driver = model.driver();
+            let result = driver.run(&input);
+            println!(" input: {:?}", input);
+            println!("output: {:?}", result.output());
+            
+        }
+        eprintln!(
+            "{:.2}% complete - {}% valid predictions",
+            100.0 * trial as f32 / params.trials as f32,
+            100.0
+                * prediction_validity
+                    .iter()
+                    .map(|&v| if v { 1.0 } else { 0.0 })
+                    .sum::<f32>()
+                / prediction_validity.len() as f32,
+        );
 
-            let chosen_rects = std::iter::repeat_with(|| params.rects.choose(&mut rng).unwrap())
-                .take(packing_size);
+        let trials_per_thread = params.batch_size / parallelism;
+        let results = pool.broadcast(|_ctx| {
+            let mut driver = model.driver();
+            let mut rng = rand::thread_rng();
+            let mut dx = vec![0.0; driver.model().variable_count()];
+            let mut prediction_validity = Vec::with_capacity(trials_per_thread);
 
-            if let Some(packing) = find_packing(
-                &mut rand::thread_rng(),
-                &mut driver,
-                &params.bounds,
-                chosen_rects,
-                exploit_chance,
-            ) {
-                break packing;
-            }
-        };
+            let mut trial = 0;
+            while trial < trials_per_thread {
+                let (packing, net_actions) = loop {
+                    let packing_size =
+                        rng.gen_range(params.packing_size_min..=params.packing_size_max);
 
-        let reward = reward(&params.bounds, &packing);
+                    let chosen_rects =
+                        std::iter::repeat_with(|| params.rects.choose(&mut rng).unwrap())
+                            .take(packing_size);
 
-        if reward > reward_threshold {
-            // status message
-            if trial % (params.trials / 100) == 0 {
-                eprintln!(
-                    "{}% complete - {}% valid predictions",
-                    trial / (params.trials / 100),
-                    100.0
-                        * prediction_validity
-                            .iter()
-                            .map(|&v| if v { 1.0 } else { 0.0 })
-                            .sum::<f32>()
-                        / prediction_validity.len() as f32,
-                );
-                eprintln!("variab: {:?}", driver.model().variables().sum::<f32>());
-                eprintln!("varidx: {:?}", dx.iter().sum::<f32>())
-            }
+                    if let Some(packing) = find_packing(
+                        &mut rand::thread_rng(),
+                        &mut driver,
+                        &params.bounds,
+                        chosen_rects,
+                        exploit_chance,
+                    ) {
+                        break packing;
+                    }
+                };
 
-            trial += 1;
+                let reward = reward(&params.bounds, &packing);
 
-            let mut q = (reward - reward_threshold) / (1.0 - reward_threshold);
+                if reward > reward_threshold {
+                    trial += 1;
 
-            for (i, rect) in packing.iter().enumerate().rev() {
-                let packing_up_to = &packing[..i];
+                    let mut q = (reward - reward_threshold) / (1.0 - reward_threshold);
 
-                let input = vectorize_input(&params.bounds, packing_up_to, rect.width(), rect.height());
-                let target = vectorize_output(&params.bounds, rect.x1, rect.y1);
+                    for (i, rect) in packing.iter().enumerate().rev() {
+                        let packing_up_to = &packing[..i];
 
-                let result = driver.run_and_record(&input);
+                        let input = vectorize_input(
+                            &params.bounds,
+                            packing_up_to,
+                            rect.width(),
+                            rect.height(),
+                        );
+                        let target = vectorize_output(&params.bounds, rect.x1, rect.y1);
 
-                if trial % (params.trials / 100) == 0 {
-                    eprintln!(" input: {:?}", input);
-                    eprintln!("target: {:?}", target);
-                    eprintln!("output: {:?}", result.output());
+                        let result = driver.run_and_record(&input);
+
+                        let (x1, y1) = devectorize_output(&params.bounds, result.output());
+                        let predicted = Rect {
+                            x1,
+                            y1,
+                            x2: x1 + rect.width(),
+                            y2: y1 + rect.height(),
+                        };
+                        let valid = packing_up_to.iter().all(|r| !r.overlaps(&predicted));
+                        prediction_validity.push(valid);
+
+                        let weight = if net_actions[i] {
+                            q * params.exploit_weight
+                        } else {
+                            q
+                        };
+                        result.compute_gradients(&target, |idx, val| dx[idx] += weight * val);
+
+                        q *= params.future_discount;
+                    }
                 }
 
-                let (x1, y1) = devectorize_output(&params.bounds, result.output());
-                let predicted = Rect {
-                    x1,
-                    y1,
-                    x2: x1 + rect.width(),
-                    y2: y1 + rect.height(),
-                };
-                let valid = packing_up_to.iter().all(|r| !r.overlaps(&predicted));
-                if prediction_validity.len() == prediction_validity.capacity() {
+                trial += 1;
+            }
+
+            (dx, prediction_validity)
+        });
+
+        for (thread_dx, thread_prediction_validity) in results {
+            dx.iter_mut()
+                .zip(thread_dx.iter())
+                .for_each(|(dx, tdx)| *dx += tdx);
+            if prediction_validity.capacity()
+                < prediction_validity.len() + thread_prediction_validity.len()
+            {
+                for _ in 0..thread_prediction_validity.len() {
                     prediction_validity.pop_front();
                 }
-                prediction_validity.push_back(valid);
-
-                let weight = if net_actions[i] {
-                    q * params.exploit_weight
-                } else {
-                    q
-                };
-                result.compute_gradients(&target, |idx, val| dx[idx] += weight * val);
-                grads += 1;
-
-                if grads % params.batch_size == 0 {
-                    /*eprintln!(" input: {:?}", input);
-                    eprintln!("target: {:?}", target);
-                    eprintln!("output: {:?}", result.output());
-                    eprintln!("  vars: {:?}", driver.model().variables().sum::<f32>());*/
-                    dx.iter_mut().for_each(|dx| *dx /= params.batch_size as f32);
-                    optimizer.learning_rate = (1.0 - fraction_complete)
-                        * params.learning_rate_start
-                        + fraction_complete * params.learning_rate_end;
-                    optimizer.apply(driver.model_mut().variables_mut().zip(dx.iter()));
-                    dx.iter_mut().for_each(|dx| *dx = 0.0);
-                }
-
-                q *= params.future_discount;
             }
+            for p in thread_prediction_validity {
+                prediction_validity.push_back(p);
+            }
+
+            trial += trials_per_thread;
         }
+
+        dx.iter_mut()
+            .for_each(|dx| *dx /= (trials_per_thread * parallelism) as f32);
+        optimizer.learning_rate = (1.0 - fraction_complete) * params.learning_rate_start
+            + fraction_complete * params.learning_rate_end;
+        optimizer.apply(model.variables_mut().zip(dx.iter()));
+        dx.iter_mut().for_each(|dx| *dx = 0.0);
     }
 }
 
 fn find_packing<'a>(
     rng: &mut impl rand::Rng,
-    driver: &mut ModelDriver<&mut Model>,
+    driver: &mut ModelDriver<impl Deref<Target = Model>>,
     bounds: &Rect,
     rects: impl Iterator<Item = &'a Rect>,
     exploit_chance: f32,

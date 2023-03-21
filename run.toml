@@ -24,21 +24,21 @@ bounds = [0, 0, 16, 16]
 packing_size_min = 3
 packing_size_max = 7
 
-learning_rate_start = 0.000001
+learning_rate_start = 0.000005
 learning_rate_end = 0.0
-beta_1 = 0.9
-beta_2 = 0.99
+beta_1 = 0.5
+beta_2 = 0.5
 
-batch_size = 1024
+batch_size = 2048
 
-trials = 1_000_000
+trials = 50_00_000
 
 future_discount = 0.75
 
-exploit_chance_start = 0.9
-exploit_chance_end = 0.9
+exploit_chance_start = 0.2
+exploit_chance_end = 0.3
 
 exploit_weight = 0.0
 
-reward_threshold_start = 0.5
-reward_threshold_end = 0.7
+reward_threshold_start = 0.8
+reward_threshold_end = 0.9
